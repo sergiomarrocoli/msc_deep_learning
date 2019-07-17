@@ -1,8 +1,9 @@
 # install.packages("dplyr")
 # install.packages("tidyr")
+install.packages('datetime')
 library(dplyr)
 library(tidyr)
-
+library(datetime)
 
 
 # load data
@@ -77,11 +78,20 @@ unique(fine_classes) # 5,500 classes - ignore for now
 
 # lists of videos of each species
 
-
 # split into day and night
 
-# split into training and test
+# classify by hour
+coarse_classifications$hour <- sapply(coarse_classifications$created_at, function(x){as.integer(strsplit(strsplit(x, " ")[[1]][[2]], ":")[[1]][[1]])})
 
+day_videos <- coarse_classifications[coarse_classifications$hour > 8 & coarse_classifications$hour < 16,]
+night_videos <- coarse_classifications[coarse_classifications$hour < 4 | coarse_classifications$hour > 20,]
+
+nrow(day_videos) # 1039292
+nrow(night_videos) # 1033975
+nrow(coarse_classifications) # 3821088
+
+
+# split into training and test
 
 
 
