@@ -1,6 +1,6 @@
 # install.packages("dplyr")
 # install.packages("tidyr")
-install.packages('datetime')
+# install.packages('datetime')
 library(dplyr)
 library(tidyr)
 library(datetime)
@@ -9,15 +9,21 @@ library(datetime)
 # load data
 setwd("/media/sergio/0C5EC1615EC14464/chimp_and_see/data/raw")
 
+# ubuntu
+setwd("/media/sergio/0C5EC1615EC14464/chimp_and_see/data/raw")
 coarse_classifications <- read.csv2('2019-07-07_chimp_classifications.csv', stringsAsFactors = F, sep = ",", header = TRUE)
 fine_classifications <- read.csv2('2019-07-07_chimp_discussions.csv', stringsAsFactors = F, sep = ",", header = TRUE)
 
-#  data
-setwd("/media/sergio/0C5EC1615EC14464/chimp_and_see/data/raw")
+# windows
+setwd("D:/Documents/msc_deep_learning/Data/")
+coarse_classifications <- read.csv2('2019-06-30_chimp_classifications.csv', stringsAsFactors = F, sep = ",", header = TRUE)
+# fine_classifications <- read.csv2('2019-07-07_chimp_discussions.csv', stringsAsFactors = F, sep = ",", header = TRUE)
+
+
 
 # explore coarse classifications
 species_classifications <- unique(coarse_classifications$animal)
-species_classifications <- species_classifications[-1]
+species_classifications <- species_classifications[-(species_classifications == "")]
 # [1] ""                    "red river hog"       "large ungulate"      "human"               "small grey duiker"  
 # [6] "chimpanzee"          "other (non-primate)" "red duiker"          "dark duiker"         "bird"               
 # [11] "small antelope"      "other (primate)"     "rodent"              "elephant"            "gorilla"            
@@ -93,7 +99,27 @@ nrow(coarse_classifications) # 3821088
 
 # split into training and test
 
+set.seed(1)
+# how?
+# iterate over species list
+# select by species
+# sample to training
+# sample to test
+assign_to_test_and_training <- function(species_col, test_prop = 0.3){
+  # species_list <- species_col[-(species_col == "")]
+  species_list <- unique(species_col)
+  species_list <- species_list[-(species_list == "")]
+  assignment <- rep("Training", length(species_col))  
+  for(species in species_list){
+    species_index <- which(species_col == species)
+    test_index <- sample(species_index, test_prop * length(species_index))
+    assignment[test_index] = "Test"    
+  }
+  return(assignment)
+}
 
+day_videos$Training <- assign_to_test_and_training(day_videos$animal)
+table(x)
 
 
 
