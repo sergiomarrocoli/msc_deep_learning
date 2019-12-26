@@ -7,7 +7,8 @@ library(datetime)
 
 
 # load data
-setwd("/media/sergio/0C5EC1615EC14464/chimp_and_see/data/raw")
+# setwd("/media/sergio/0C5EC1615EC14464/chimp_and_see/data/raw")
+setwd("D:/R/msc")
 
 # ubuntu
 setwd("/media/sergio/0C5EC1615EC14464/chimp_and_see/data/raw")
@@ -34,6 +35,8 @@ species_classifications <- species_classifications[-(species_classifications == 
 
 data.frame(table(coarse_classifications$animal))
 coarse_sp_fq <- data.frame(table(coarse_classifications$animal))
+str(coarse_sp_fq)
+sum(coarse_sp_fq$Freq)/4
 str(coarse_sp_fq)
 colnames(coarse_sp_fq) <- c("Species", "Count")
 coarse_sp_fq[order(-coarse_sp_fq$Count),]
@@ -123,3 +126,143 @@ table(x)
 
 
 
+
+
+# get classes for test videos
+setwd("D:/R/msc")
+test_videos <- read.csv("test_videos.csv", stringsAsFactors = FALSE)
+table(test_videos$zamba_classification)
+test_videos$filename <- gsub("[.].*", "", test_videos$filename)
+files <- test_videos$filename
+
+human_classifications <- coarse_classifications[coarse_classifications$subject_id %in% files, ]
+human_classifications <- human_classifications[c("subject_id", "animal", "number")]
+colnames(human_classifications)
+
+
+# get most common human classifications
+human_classifications_species <- human_classifications %>%
+  select(-number) %>%
+  group_by(subject_id) %>%
+  slice(which.max(table(animal)))
+  
+human_classifications_number <- human_classifications %>%
+  select(-animal) %>%
+  group_by(subject_id) %>%
+  slice(which.max(table(number)))
+
+# join to test_videos
+colnames(human_classifications_species) <- c("filename", "human_classification_species")
+colnames(human_classifications_number) <- c("filename", "human_classification_number")
+
+test_videos <- test_videos %>%
+  left_join(human_classifications_species, by = "filename")
+
+test_videos <- test_videos %>%
+  left_join(human_classifications_number, by = "filename")
+
+
+# add my algo classification
+yolo_classifications<- read.csv("video_predictions_20191221.csv", stringsAsFactors = FALSE)
+
+
+test_videos <- test_videos %>%
+  left_join(yolo_classifications, by = "filename")
+
+# rename columns
+colnames(test_videos) <- c("filename", "zamba_species",
+                           "me_species", "me_number",
+                           "cit_sci_species", "cit_sci_number", 
+                           "yolo_species", "yolo_number")
+
+# replace NAs with blanks where necessary
+test_videos[is.na(test_videos$yolo_species), 7] <- "blank"
+test_videos[test_videos$yolo_species == "blank", 8] <- 1
+
+
+# replace NAs with blanks where necessary
+test_videos[test_videos$cit_sci_species == "", 5] <- "blank"
+test_videos[test_videos$cit_sci_species == "blank", 6] <- 1
+# make 5+ 5
+test_videos[test_videos$cit_sci_number == "5+", 6] <- 5
+test_videos$cit_sci_number <- as.integer(test_videos$cit_sci_number)
+
+
+# plots and correlations of numbers
+plot(test_videos$me_number, test_videos$yolo_number)
+cor.test(test_videos$me_number, test_videos$yolo_number)
+
+
+plot(test_videos$me_number, test_videos$cit_sci_number)
+cor.test(test_videos$me_number, test_videos$cit_sci_number)
+
+
+# get totals of each species for me
+yolo_totals <- test_videos[7:8] %>%
+  group_by(yolo_species) %>%
+  summarise("yolo_total" = sum(yolo_number))
+
+me_totals <- test_videos[3:4] %>%
+  group_by(me_species) %>%
+  summarise("me_total" = sum(me_number))
+
+colnames(yolo_totals)[1] <- "species"
+colnames(me_totals)[1] <- "species"
+
+me_vs_yolo_totals <- full_join(me_totals, yolo_totals, by = "species")
+
+me_vs_yolo_totals[is.na(me_vs_yolo_totals)] <- 0
+
+plot(me_vs_yolo_totals$me_total, me_vs_yolo_totals$yolo_total, 
+     xlim = c(0, 250), ylim = c(0, 250),
+     xlab = "My total", ylab = "Yolov3 total")
+cor.test(me_vs_yolo_totals$me_total, me_vs_yolo_totals$yolo_total)
+me_yolo_model <- lm(me_vs_yolo_totals$yolo_total ~ me_vs_yolo_totals$me_total)
+abline(me_yolo_model)
+
+#########################################################################################
+
+# ZAMBA DATA PREP
+
+# zamba vs
+test_videos_zamba_categories <- test_videos
+test_videos_zamba_categories[test_videos_zamba_categories == "red duiker"] <- "duiker"
+test_videos_zamba_categories[test_videos_zamba_categories == "small grey duiker"] <- "duiker"
+test_videos_zamba_categories[test_videos_zamba_categories == "red river hog"] <- "hog"
+test_videos_zamba_categories[test_videos_zamba_categories == "sooty mangabey"] <- "other (primate)"
+test_videos_zamba_categories[test_videos_zamba_categories == "black and white colobus"] <- "other (primate)"
+test_videos_zamba_categories[test_videos_zamba_categories == "red colobus"] <- "other (primate)"
+test_videos_zamba_categories[test_videos_zamba_categories == "baboon"] <- "other (primate)"
+
+# get totals of each species for me
+yolo_count <- test_videos_zamba_categories[7:8] %>%
+  group_by(yolo_species) %>%
+  summarise("yolo_count" = n())
+
+me_count <- test_videos_zamba_categories[3:4] %>%
+  group_by(me_species) %>%
+  summarise("me_count" = n())
+
+zamba_count <- test_videos_zamba_categories[2] %>%
+  group_by(zamba_species) %>%
+  summarise("zamba_count" = n())
+
+colnames(yolo_count)[1] <- "species"
+colnames(me_count)[1] <- "species"
+colnames(zamba_count)[1] <- "species"
+
+zamba_vs_all_count <- full_join(me_count, yolo_count, by = "species")
+zamba_vs_all_count <- full_join(zamba_vs_all_count, zamba_count, by = "species")
+
+zamba_vs_all_count[is.na(zamba_vs_all_count)] <- 0
+
+# plots
+plot(zamba_vs_all_count$me_count, zamba_vs_all_count$yolo_count,
+     xlab = "My count", ylab = "Zamba/Yolov3 count")
+points(zamba_vs_all_count$me_count, zamba_vs_all_count$zamba_count, pch = 19)
+
+zamba_me_model <- lm(zamba_vs_all_count$zamba_count ~ zamba_vs_all_count$me_count)
+abline(zamba_me_model)
+
+yolo_me_model <- lm(zamba_vs_all_count$yolo_count ~ zamba_vs_all_count$me_count)
+abline(yolo_me_model, lty = 3)
